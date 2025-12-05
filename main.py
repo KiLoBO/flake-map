@@ -21,7 +21,6 @@ class NixFlakeMapper(App):
     def compose(self) -> ComposeResult:
         """Create child widgets"""
         yield Header()
-        # yield ListView(id="output")
         yield Tree("Flake Files", id="file-tree")
         yield Footer()
 
@@ -43,7 +42,7 @@ class NixFlakeMapper(App):
         tree.clear()
 
         # Set root label to flake directory name
-        tree.label = f"📁 {self.flake_index.flakeRoot.name}"
+        tree.root.label = f"📁 {self.flake_index.flakeRoot.name}"
         tree.root.expand()
 
         # Build directory structure
