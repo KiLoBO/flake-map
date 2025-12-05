@@ -1,5 +1,5 @@
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, ListView, ListItem, Label
+from textual.widgets import Header, Footer, Tree
 
 from typing import ClassVar, Optional
 from pathlib import Path
@@ -21,7 +21,8 @@ class NixFlakeMapper(App):
     def compose(self) -> ComposeResult:
         """Create child widgets"""
         yield Header()
-        yield ListView(id="output")
+        # yield ListView(id="output")
+        yield Tree("Flake Files", id="file-tree")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -31,25 +32,60 @@ class NixFlakeMapper(App):
             self.exit()
             return
 
-        self.notify(f"Flake foundL {self.flake_index.flakePath}")
-        self.refreshFileList()
+        self.notify(f"Flake found: {self.flake_index.flakePath}")
+        self.refreshFileTree()
 
-    def refreshFileList(self) -> None:
-        """Refresh the list of .nix files. (r)"""
+    def refreshFileTree(self) -> None:
+        """Populate the file tree structure."""
         nixFiles = self.flake_index.getNixFiles()
 
-        listView = self.query_one("#output", ListView)
-        listView.clear()
+        tree = self.query_one("#file-tree", Tree)
+        tree.clear()
+
+        # Set root label to flake directory name
+        tree.label = f"📁 {self.flake_index.flakeRoot.name}"
+        tree.root.expand()
+
+        # Build directory structure
+        dir_nodes = {}  # Cache for directory nodes
 
         for file in sorted(nixFiles):
             relPath = file.relative_to(self.flake_index.flakeRoot)
-            listView.append(ListItem(Label(str(relPath))))
+            parts = relPath.parts
+
+            # Build directory hierarchy
+            current_node = tree.root
+            current_path = Path()
+
+            # Create intermediate directory nodes
+            for part in parts[:-1]:  # All except the filename
+                current_path = current_path / part
+                path_str = str(current_path)
+
+                if path_str not in dir_nodes:
+                    # Create new directory node
+                    dir_node = current_node.add(f"📁 {part}", expand=False)
+                    dir_nodes[path_str] = dir_node
+                    current_node = dir_node
+                else:
+                    current_node = dir_nodes[path_str]
+
+            # Add the file to its parent directory
+            filename = parts[-1]
+            file_node = current_node.add_leaf(f"📄 {filename}")
+            file_node.data = file
 
         self.notify(f"Found {len(nixFiles)} .nix files")
 
     def action_refresh(self) -> None:
-        """Refresh file list"""
-        self.refreshFileList()
+        """Refresh file tree"""
+        self.refreshFileTree()
+
+    def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
+        """Handle file selection"""
+        if event.node.data:
+            selFilePath = event.node.data
+            self.notify(f"Selected: {selFilePath}")
 
 
 def main():
